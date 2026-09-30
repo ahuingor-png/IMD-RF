@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RF - Agregar producto</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:10px;font-family:system-ui,Arial,sans-serif;background:#f1f5f9;color:#0f172a}
+.card{background:#fff;border:2px solid #2563eb;border-radius:18px;padding:14px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px}
+.t{font-weight:800;font-size:13px;display:flex;align-items:center;gap:8px}
+.t span{background:#2563eb;color:#fff;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none}
+.pill{font-size:10px;font-weight:800;padding:5px 10px;border-radius:20px;background:#fee2e2;color:#b91c1c;cursor:pointer;white-space:nowrap}
+.pill.ok{background:#dcfce7;color:#166534}
+label{display:block;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin:8px 0 3px}
+input,select,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:12px;font-size:15px;background:#fff;font-family:inherit}
+#p_folio{border:2px solid #2563eb;font-weight:700}#p_desc{background:#eff6ff;border-color:#2563eb}
+.g{display:grid;grid-template-columns:2fr 1fr;gap:10px}.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{width:100%;border:0;border-radius:12px;padding:14px;font-size:15px;font-weight:800;color:#fff;margin-top:12px}
+#btnAdd{background:linear-gradient(90deg,#2563eb,#1d4ed8)}
+#msg{margin-top:10px;font-size:12px;font-weight:700;text-align:center;min-height:16px}
+#cfg{display:none;margin-bottom:8px;background:#f8fafc;padding:8px;border-radius:12px}
+#modal{display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:10px}
+.mbox{background:#fff;width:100%;max-width:500px;max-height:96vh;overflow:auto;border-radius:20px;border:3px solid #f59e0b}
+.mh{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;font-weight:800}
+.mb{padding:14px}
+#noimg{border:2px dashed #f59e0b;border-radius:14px;padding:16px;text-align:center;background:#fffbeb}
+#prev{display:none;width:100%;max-height:250px;object-fit:contain;border-radius:12px;background:#111}
+.info{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-top:10px}
+</style></head><body>
+<div class="card">
+ <div class="top"><div class="t"><span>+</span>AGREGAR PRODUCTO - AUTOLLENADO</div><div class="pill" id="pill" onclick="toggleCfg()">● CONECTANDO…</div></div>
+ <div id="cfg"><label>Código de sincronización (solo cámbialo si usas otro)</label>
+  <input id="code" value="QOLQAS-1" style="text-transform:uppercase;font-weight:800;text-align:center"><button style="background:#16a34a;margin-top:8px;padding:10px" onclick="conectar()">Conectar</button></div>
+ <div class="g"><div><label>N° Folio / Rastreo *</label><input id="p_folio" placeholder="Escanea o escribe folio" oninput="autoFill()" onkeydown="if(event.key==='Enter'){event.preventDefault();autoFill();p_origen.focus()}" autocomplete="off"></div>
+ <div><label>Cant.</label><input id="p_cant" type="number" value="1"></div></div>
+ <div class="g2"><div><label>SKU (Auto)</label><input id="p_sku" placeholder="Auto"></div>
+ <div><label>Origen daño A-K</label><select id="p_origen" onchange="autoDamage()"><option value="">-- Selecciona --</option>
+ <option value="A">A - Empaque dañando</option><option value="B">B - Producto incompleto</option><option value="C">C - Deterioro por tiempo</option><option value="D">D - Producto dañado</option><option value="E">E - Daño en transporte</option><option value="F">F - Mal embalaje</option><option value="G">G - Daño en origen</option><option value="H">H - Mala manipulación</option><option value="I">I - Falla control calidad</option><option value="J">J - Fallo de fábrica</option><option value="K">K - Otros</option></select></div></div>
+ <label>Descripción (Auto - NOMBRE_PRODUCTO)</label><input id="p_desc" placeholder="Auto desde NOMBRE_PRODUCTO">
+ <div class="g2"><div><label>Descripción daño (Auto)</label><input id="p_ddano" placeholder="Auto por letra"></div>
+ <div><label>Ubicación daño</label><input id="p_ubic" placeholder="Ej: Puerta frontal"></div></div>
+ <button id="btnAdd" onclick="abrirFoto()">+ AGREGAR AL FORMATO</button>
+ <div id="msg"></div>
+</div>
+
+<div id="modal"><div class="mbox">
+ <div class="mh"><span>📸 Evidencia para <span id="mFolio">-</span></span><span onclick="cerrarModal()" style="cursor:pointer;padding:0 6px">✕</span></div>
+ <div class="mb">
+  <img id="prev">
+  <div id="noimg"><div style="font-size:30px">📸</div><b style="font-size:12px">Foto de evidencia obligatoria</b>
+   <div class="g2"><button style="background:#f59e0b" onclick="cam.click()">📷 Cámara</button><button style="background:#64748b" onclick="gal.click()">🖼️ Galería</button></div></div>
+  <input type="file" id="cam" accept="image/*" capture="environment" style="display:none" onchange="elegida(event)">
+  <input type="file" id="gal" accept="image/*" style="display:none" onchange="elegida(event)">
+  <div class="info"><div style="font-size:10px;font-weight:800;color:#64748b">SEGUIMIENTO</div><div id="mCod" style="font-weight:800;font-size:13px"></div><div id="mDesc" style="font-size:11px;color:#64748b"></div></div>
+  <label>Descripción del daño * (sale en cada imagen)</label><textarea id="mDano" rows="3" placeholder="Ej: Producto incompleto, caja rota..."></textarea>
+  <div class="g2"><div><label>Origen</label><input id="mOrigen"></div><div><label>Ubicación</label><input id="mUbic"></div></div>
+  <div class="g2"><button style="background:#94a3b8" onclick="cerrarModal()">Cancelar</button><button id="btnEnv" style="background:#16a34a" onclick="enviar()">✓ Guardar y enviar</button></div>
+ </div></div></div>
+
+<script>
+firebase.initializeApp({apiKey:"AIzaSyA0myKXhfkc4engnf-5c5GFi7Fc2wEcMhE",authDomain:"escaneos-1b0e8.firebaseapp.com",databaseURL:"https://escaneos-1b0e8-default-rtdb.firebaseio.com",projectId:"escaneos-1b0e8",storageBucket:"escaneos-1b0e8.firebasestorage.app",messagingSenderId:"645259983510",appId:"1:645259983510:web:0d411bd7ba0c73b64ca0b7"});
+const db=firebase.database(), $=id=>document.getElementById(id), cam=$('cam'), gal=$('gal');
+const damageMap={'A':'Empaque dañando','B':'Producto incompleto','C':'Deterioro del producto por tiempo','D':'Producto dañado','E':'Daño en el transporte','F':'Mal embalaje','G':'Daño en origen','H':'Daño por mala manipulación','I':'Falla de control de calidad en origen de despacho','J':'Fallo de fábrica','K':'Otros'};
+const CODIGO_DEFECTO='QOLQAS-1';
+let excelData=[], code='', item=null, foto=null, refExcel=null;
+const authListo=firebase.auth().signInAnonymously().catch(e=>{msg('Auth falló: '+(e.code||e.message),false)});
+function limpiar(c){return (c||'').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'_')}
+function toggleCfg(){const c=$('cfg');c.style.display=c.style.display==='block'?'none':'block'}
+function msg(t,ok){const m=$('msg');m.textContent=t;m.style.color=ok===false?'#b91c1c':'#166534'}
+function conectar(){
+  code=limpiar($('code').value)||CODIGO_DEFECTO; localStorage.setItem('rf_code',code); $('code').value=code;
+  authListo.then(()=>{
+    if(refExcel) refExcel.off();
+    refExcel=db.ref('imd_manual/'+code+'/excelData');
+    refExcel.on('value',s=>{excelData=Object.values(s.val()||{});$('pill').className='pill ok';$('pill').textContent='● '+code+' · Excel: '+excelData.length;},
+      e=>{$('pill').className='pill';$('pill').textContent='● SIN PERMISO';msg(e.message,false)});
+    $('cfg').style.display='none';
+  });
+}
+function autoDamage(){const l=$('p_origen').value;if(damageMap[l])$('p_ddano').value=damageMap[l]}
+function autoFill(){
+  const f=$('p_folio').value.trim().toLowerCase(); if(!f||!excelData.length) return;
+  const x=excelData.find(it=>{const g=(it.folio||'').toLowerCase();return g===f||g.includes(f)||f.includes(g)});
+  if(x){$('p_sku').value=x.sku||'';$('p_desc').value=x.desc||''}
+}
+function abrirFoto(){
+  const f=$('p_folio').value.trim(),s=$('p_sku').value,o=$('p_origen').value;
+  if(!f&&!s){msg('Ingresa el folio',false);return}
+  item={folio:f,cant:$('p_cant').value||'1',sku:s,desc:$('p_desc').value,origen:o,ddano:$('p_ddano').value||damageMap[o]||'',ubic:$('p_ubic').value};
+  foto=null; $('prev').style.display='none'; $('prev').src=''; $('noimg').style.display='block';
+  $('mFolio').textContent=f; $('mCod').textContent=f; $('mDesc').textContent=(s?s+' - ':'')+(item.desc||'');
+  $('mDano').value=item.ddano; $('mOrigen').value=o; $('mUbic').value=item.ubic;
+  $('btnEnv').disabled=false; $('btnEnv').textContent='✓ Guardar y enviar';
+  $('modal').style.display='flex';
+}
+function cerrarModal(){$('modal').style.display='none'}
+function reducir(file){return new Promise((res,rej)=>{
+  const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{
+    const M=1280,k=Math.min(1,M/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.7))};im.src=r.result};r.readAsDataURL(file)})}
+async function elegida(e){
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ foto=await reducir(f); $('prev').src=foto; $('prev').style.display='block'; $('noimg').style.display='none'; }
+  catch(err){ alert('No se pudo leer la foto'); }
+}
+function enviar(){
+  if(!foto){alert('Debes tomar una foto primero 📸');return}
+  const dano=$('mDano').value.trim(); if(!dano){alert('Escribe la descripción del daño');return}
+  const rec=Object.assign({},item,{ddano:dano,origen:$('mOrigen').value||item.origen,ubic:$('mUbic').value||item.ubic,
+    dataUrl:foto,name:'Evidencia_'+item.folio+'_'+Date.now()+'.jpg',date:new Date().toLocaleString(),ts:Date.now()});
+  $('btnEnv').disabled=true; $('btnEnv').textContent='Enviando…';
+  const limpio=()=>{['p_folio','p_sku','p_desc','p_ddano','p_ubic','p_origen'].forEach(i=>$(i).value='');$('p_cant').value='1';$('p_folio').focus()};
+  const t=setTimeout(()=>{msg('⏳ Sin respuesta de la nube… revisa la conexión. Quedó en cola.',false);cerrarModal();limpio()},8000);
+  db.ref('imd_manual/'+code+'_RF/items').push(rec).then(()=>{
+    clearTimeout(t); cerrarModal(); limpio(); msg('✓ '+rec.folio+' enviado a la laptop');
+  }).catch(err=>{clearTimeout(t);$('btnEnv').disabled=false;$('btnEnv').textContent='✓ Guardar y enviar';alert('No se pudo enviar: '+err.message)});
+}
+document.addEventListener('DOMContentLoaded',()=>{$('code').value=localStorage.getItem('rf_code')||CODIGO_DEFECTO;conectar()});
+</script></body></html>
